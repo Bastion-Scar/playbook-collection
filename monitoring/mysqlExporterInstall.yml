@@ -1,0 +1,73 @@
+---
+- name: Install MySQL Exporter in Docker + replication lag metric
+  hosts: db_servers
+  become: yes
+
+  vars_files:
+    - ../vars/variables.yml
+
+  tasks:
+
+    - name: Install dependencies
+      apt:
+        name:
+          - python3-docker
+          - python3-pymysql
+        state: present
+        update_cache: yes
+
+    - name: Ensure Docker is running
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Create MySQL exporter user (only if not exists)
+      community.mysql.mysql_user:
+        name: "{{ exporter_user }}"
+        password: "{{ exporter_password }}"
+        host: "%"
+        priv: "*.*:PROCESS,REPLICATION CLIENT,SLAVE MONITOR,SELECT"
+        login_user: "{{ mysql_root_user }}"
+        login_password: "{{ mysql_root_password }}"
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+        state: present
+        update_password: on_create
+
+    - name: Create .my.cnf for exporter
+      copy:
+        dest: /opt/mysql-exporter.cnf
+        content: |
+          [client]
+          user={{ exporter_user }}
+          password={{ exporter_password }}
+        owner: root
+        group: root
+        mode: '0600'
+
+    - name: Deploy mysql recording rules
+      template:
+        src: ../files/mysql_rules.yml.j2
+        dest: /etc/prometheus/rules/mysql_rules.yml
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Run MySQL Exporter container
+      community.docker.docker_container:
+        name: mysql-exporter
+        image: prom/mysqld-exporter:v0.19.0
+        state: started
+        user: "0"
+        restart_policy: always
+        recreate: yes
+        network_mode: host
+        volumes:
+          - /opt/mysql-exporter.cnf:/etc/.my.cnf:ro
+        command: >
+          --config.my-cnf=/etc/.my.cnf
+          --mysqld.address=127.0.0.1:3306
+          --collect.global_status
+          --collect.global_variables
+          --collect.slave_status
+          --collect.info_schema.processlist

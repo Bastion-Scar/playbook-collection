@@ -1,0 +1,71 @@
+mariadb_root_password: "root"
+mariadb_bind_address: "0.0.0.0" 
+
+
+wp_db_password: "123321aA!"
+wp_db_host: "10.202.49.107"
+wp_db_name: wordpress
+wp_db_user: wpuser
+wp_allowed_host: "10.202.49.110"
+wordpress_root_password: "root"
+wordpress_bind_address: "0.0.0.0"    
+wp_site_dir: /var/www/html/wordpress
+wp_domain: wordpress.scar
+domain: wordpress.scar
+proxy_target: "{{ wp_allowed_host }}"
+
+
+ansible_user: root
+ansible_ssh_private_key_file: "~/.ssh/proxmox_vm_keys"
+
+username: zabbix
+password: "zabbix"
+
+
+ssl_cert_path: "/etc/ssl/certs/{{ domain }}+3.pem"
+ssl_key_path: "/etc/ssl/private/{{ domain }}+3-key.pem"
+
+loki_server: "10.202.49.56"
+
+node_exporter_version: "1.8.1"
+
+grafana_version: 12.4-ubuntu
+grafana_user: admin
+grafana_password: admin
+grafana_port: 3000
+grafana_smtp_enabled: "true"
+grafana_smtp_host: "smtp.gmail.com:587"
+grafana_smtp_user: "ikoptelov46@gmail.com"
+grafana_smtp_password: "bczoqvglodjtnagr"
+grafana_smtp_from_address: "ikoptelov46@gmail.com"
+grafana_smtp_from_name: "Grafana"
+grafana_smtp_starttls_policy: "OpportunisticStartTLS"
+
+pve_host: "https://10.202.49.203:8006"
+pve_user: "root@pam"
+pve_password: "root"
+pve_token_id: "monitoring"
+pve_token: "e55321c8-3be5-422d-8326-9dee5b8a32b5"
+pve_exporter_port: 9221
+
+
+exporter_user: "exporter"
+exporter_password: "123321aA!"
+exporter_port: 9104
+mysql_host: "10.202.49.107"
+mysql_root_user: "root"
+mysql_root_password: "root"
+
+
+zabbix_db_host: "10.202.49.97"
+zabbix_db_name: "zabbix"
+zabbix_db_user: "zabbix"
+zabbix_db_password: "zabbix"
+zabbix_server: "10.202.49.56"
+zabbix_image_tag: "7.4-ubuntu-latest"
+
+smtp_server: "smtp.gmail.com"
+smtp_port: "587"
+smtp_user: "ikoptelov46@gmail.com"
+smtp_password: "wfkrhtrywhovsoor "
+smtp_email: "ikoptelov46@gmail.com"

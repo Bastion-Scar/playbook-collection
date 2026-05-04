@@ -1,0 +1,118 @@
+- name: Configure Loki
+  hosts: monitoring
+  become: true
+
+  vars_files:
+    - ../vars/variables.yml
+
+  tasks:
+
+    - name: Create loki user
+      user:
+        name: loki
+        system: yes
+        shell: /sbin/nologin
+        create_home: no
+
+    - name: Create directories
+      file:
+        path: "{{ item }}" # если написать item и снизу loop, то по циклу ансибл сделает то, что было прописано
+        state: directory
+        owner: loki
+        group: loki
+        mode: '0755'
+      loop:                # установится по циклу 3 папки
+        - /etc/loki
+        - /var/lib/loki
+        - /opt/loki
+
+    - name: Download loki
+      get_url:
+        url: https://github.com/grafana/loki/releases/download/v2.9.4/loki-linux-amd64.zip
+        dest: /tmp/loki.zip
+
+    - name: Unzip loki
+      unarchive:
+        src: /tmp/loki.zip
+        dest: /opt/
+        remote_src: yes
+        creates: /opt/loki-linux-amd64
+
+    - name: Install binary
+      copy:
+        src: /opt/loki-linux-amd64
+        dest: /usr/local/bin/loki
+        mode: '0755'
+        remote_src: yes
+
+    - name: Create loki config
+      copy:
+        dest: /etc/loki/loki.yml
+        owner: loki
+        group: loki
+        mode: '0644'
+        content: |
+          auth_enabled: false
+
+          server:
+            http_listen_port: 3100
+
+          common:
+            path_prefix: /var/lib/loki
+            storage:
+              filesystem:
+                chunks_directory: /var/lib/loki/chunks
+                rules_directory: /var/lib/loki/rules
+            replication_factor: 1
+            ring:
+              kvstore:
+                store: inmemory
+
+          schema_config:
+            configs:
+              - from: 2024-01-01
+                store: tsdb
+                object_store: filesystem
+                schema: v13
+                index:
+                  prefix: index_
+                  period: 24h
+
+      notify: Restart Loki
+
+    - name: Create Loki systemd service
+      copy:
+        dest: /etc/systemd/system/loki.service
+        content: |
+          [Unit]
+          Description=Loki
+          After=network.target
+
+          [Service]
+          User=loki
+          WorkingDirectory=/var/lib/loki
+          ExecStart=/usr/local/bin/loki -config.file=/etc/loki/loki.yml
+          Restart=always
+
+          [Install]
+          WantedBy=multi-user.target
+      notify:
+        - Reload systemd
+        - Restart Loki
+
+    - name: Enable and start Loki
+      systemd:
+        name: loki
+        enabled: yes
+        state: started
+
+  handlers:
+
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: Restart Loki
+      systemd:
+        name: loki
+        state: restarted

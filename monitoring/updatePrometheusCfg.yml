@@ -1,0 +1,26 @@
+- name: Update Prometheus config from template
+  hosts: monitoring
+  become: true
+
+  tasks:
+
+    - name: Ensure prometheus rules directory exists
+      file:
+        path: /etc/prometheus/rules
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Deploy prometheus config
+      template:  # если написать copy оно не обработает jinja2 поэтому я пишу template
+        src: ../files/prometheus.yml.j2
+        dest: /etc/prometheus/prometheus.yml
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Restart Prometheus
+      systemd:
+        name: prometheus
+        state: restarted

@@ -1,0 +1,118 @@
+---
+- name: PostgreSQL prepare for Zabbix
+  hosts: psql_servers
+  become: yes
+
+  vars_files:
+    - vars/variables.yml
+
+  tasks:
+
+    - name: Get PostgreSQL version directory
+      shell: ls /etc/postgresql
+      register: pg_versions
+      changed_when: false
+
+    - name: Set pg version fact
+      set_fact:
+        pg_version: "{{ pg_versions.stdout_lines[0] }}"
+
+    - name: Set pg_hba path
+      set_fact:
+        pg_hba_path: "/etc/postgresql/{{ pg_version }}/main/pg_hba.conf"
+
+    - name: Allow Zabbix network in pg_hba.conf
+      blockinfile:
+        path: "{{ pg_hba_path }}"
+        marker: "# {mark} ANSIBLE ZABBIX RULES"
+        block: |
+          host    zabbix    zabbix    10.202.49.0/24    md5
+
+    - name: Enable listen_addresses
+      lineinfile:
+        path: "/etc/postgresql/{{ pg_version }}/main/postgresql.conf"
+        regexp: "^#?listen_addresses"
+        line: "listen_addresses = '*'"
+
+    - name: Restart PostgreSQL
+      systemd:
+        name: postgresql
+        state: restarted
+
+    - name: Wait for PostgreSQL
+      wait_for:
+        host: 127.0.0.1
+        port: 5432
+        timeout: 30
+
+    - name: Check if database exists
+      community.postgresql.postgresql_query:
+        login_unix_socket: /var/run/postgresql
+        db: postgres
+        query: "SELECT 1 FROM pg_database WHERE datname='{{ zabbix_db_name }}';"
+      become_user: postgres
+      vars:
+        ansible_remote_tmp: /tmp
+      register: db_check
+      changed_when: false
+
+    - name: Create database if not exists
+      community.postgresql.postgresql_db:
+        name: "{{ zabbix_db_name }}"
+        login_unix_socket: /var/run/postgresql
+      become_user: postgres
+      vars:
+        ansible_remote_tmp: /tmp
+      when: db_check.query_result[0] | length == 0
+
+    - name: Check if user exists
+      community.postgresql.postgresql_query:
+        login_unix_socket: /var/run/postgresql
+        db: postgres
+        query: "SELECT 1 FROM pg_roles WHERE rolname='{{ zabbix_db_user }}';"
+      become_user: postgres
+      vars:
+        ansible_remote_tmp: /tmp
+      register: user_check
+      changed_when: false
+
+    - name: Create user if not exists
+      community.postgresql.postgresql_user:
+        name: "{{ zabbix_db_user }}"
+        password: "{{ zabbix_db_password }}"
+        login_unix_socket: /var/run/postgresql
+      become_user: postgres
+      vars:
+        ansible_remote_tmp: /tmp
+      when: user_check.query_result[0] | length == 0
+
+    - name: Grant privileges
+      community.postgresql.postgresql_privs:
+        database: "{{ zabbix_db_name }}"
+        roles: "{{ zabbix_db_user }}"
+        type: database
+        privs: ALL
+        login_unix_socket: /var/run/postgresql
+      become_user: postgres
+      vars:
+        ansible_remote_tmp: /tmp
+
+    - name: Ensure database owner is zabbix user
+      community.postgresql.postgresql_query:
+        login_unix_socket: /var/run/postgresql
+        db: postgres
+        query: "ALTER DATABASE {{ zabbix_db_name }} OWNER TO {{ zabbix_db_user }};"
+      become_user: postgres
+      vars:
+        ansible_remote_tmp: /tmp
+
+    - name: Ensure zabbix user can create objects in public schema
+      community.postgresql.postgresql_query:
+        login_unix_socket: /var/run/postgresql
+        db: "{{ zabbix_db_name }}"
+        query:
+          - "GRANT USAGE, CREATE ON SCHEMA public TO {{ zabbix_db_user }};"
+          - "ALTER SCHEMA public OWNER TO {{ zabbix_db_user }};"
+      become_user: postgres
+      vars:
+        ansible_remote_tmp: /tmp

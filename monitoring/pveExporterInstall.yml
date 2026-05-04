@@ -1,0 +1,44 @@
+---
+- name: Deploy pve-exporter
+  hosts: monitoring
+  become: yes
+
+  vars_files:
+    - ../vars/variables.yml
+
+  tasks:
+
+    - name: Create config dir
+      file:
+        path: /opt/pve-exporter
+        state: directory
+        mode: '0755'
+
+    - name: Write pve.yml
+      copy:
+        dest: /opt/pve-exporter/pve.yml
+        mode: '0644'
+        content: |
+          default:
+            user: "{{ pve_user }}"
+            token_name: "{{ pve_token_id }}"
+            token_value: "{{ pve_token }}"
+            verify_ssl: false
+
+    - name: Run pve-exporter container
+      community.docker.docker_container:
+        name: pve-exporter
+        image: prompve/prometheus-pve-exporter:3.8.2
+        state: started
+        restart_policy: unless-stopped
+        recreate: true
+
+        ports:
+          - "9221:9221"
+
+        volumes:
+          - /opt/pve-exporter/pve.yml:/etc/prometheus/pve.yml:ro
+
+        command:
+          - "--config.file=/etc/prometheus/pve.yml"
+          - "--web.listen-address=0.0.0.0:9221"

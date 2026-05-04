@@ -1,0 +1,34 @@
+---
+- name: Install Grafana via Docker
+  hosts: monitoring
+  become: yes
+
+  vars_files:
+    - ../vars/variables.yml
+
+  tasks:
+
+    - name: Create Grafana volume
+      docker_volume:
+        name: grafana_data
+
+    - name: Run Grafana container
+      docker_container:
+        name: grafana
+        image: "grafana/grafana:{{ grafana_version }}"
+        state: started
+        restart_policy: unless-stopped
+        ports:
+          - "0.0.0.0:{{ grafana_port }}:3000"
+        env:
+          GF_SECURITY_ADMIN_USER: "{{ grafana_user }}"
+          GF_SECURITY_ADMIN_PASSWORD: "{{ grafana_password }}"
+          GF_SMTP_ENABLED: "{{ grafana_smtp_enabled }}"
+          GF_SMTP_HOST: "{{ grafana_smtp_host }}"
+          GF_SMTP_USER: "{{ grafana_smtp_user }}"
+          GF_SMTP_PASSWORD: "{{ grafana_smtp_password }}"
+          GF_SMTP_FROM_ADDRESS: "{{ grafana_smtp_from_address }}"
+          GF_SMTP_FROM_NAME: "{{ grafana_smtp_from_name }}"
+          GF_SMTP_STARTTLS_POLICY: "{{ grafana_smtp_starttls_policy }}"
+        volumes:
+          - grafana_data:/var/lib/grafana

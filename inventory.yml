@@ -1,0 +1,37 @@
+all:
+
+  vars:
+    ansible_ssh_private_key_file: "~/.ssh/proxmox_vm_keys"
+    ansible_user: root
+
+  children:
+    db_servers:
+      hosts:
+        vm1:
+          ansible_host: 10.202.49.107
+          ansible_user: root
+        vm2:
+          ansible_host: 10.202.49.114
+          ansible_user: root
+          
+    wordpress:
+      hosts:
+        wp1:
+          ansible_host: 10.202.49.110
+          ansible_user: root
+
+    monitoring:
+          hosts:
+            mon1:
+              ansible_host: 10.202.49.56
+              ansible_user: root
+
+    psql_servers:
+      hosts:
+        psql1:
+          ansible_host: 10.202.49.97
+          ansible_user: root
+
+        psql2:
+          ansible_host: 10.202.49.102
+          ansible_user: root  

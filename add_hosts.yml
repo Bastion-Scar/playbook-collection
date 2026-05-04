@@ -1,0 +1,16 @@
+- name: Add wordpress.scar to hosts
+  hosts: monitoring
+  become: true
+
+  vars:
+    wordpress_ip: "{{ hostvars['wp1']['ansible_host'] }}"
+    wordpress_domain: "wordpress.scar"
+
+  tasks:
+
+    - name: Ensure hosts entry exists
+      lineinfile:
+        path: /etc/hosts
+        line: "{{ wordpress_ip }} {{ wordpress_domain }}"
+        state: present
+        create: yes

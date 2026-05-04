@@ -1,0 +1,27 @@
+---
+- name: Create user
+  hosts: db_servers
+  become: yes
+
+  vars_files:
+    - vars/variables.yml
+    
+  tasks:
+    - name: Create user
+      community.mysql.mysql_user:
+        name: "{{ username }}"
+        password: "{{ password }}"
+        host: "%"
+        priv: "sys.*:SELECT"
+        state: present
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+
+    - name: Verify user exists
+      community.mysql.mysql_query:
+        query: "SELECT user, host FROM mysql.user WHERE user='{{ username }}'"
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+      register: result
+
+    - name: Show result
+      ansible.builtin.debug:
+        msg: "User created: {{ result.query_result }}"

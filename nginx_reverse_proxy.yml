@@ -1,0 +1,57 @@
+---
+- name: Install Nginx reverse proxy
+  hosts: wordpress
+  become: yes
+  vars_files:
+    - vars/variables.yml
+
+  tasks:
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
+        update_cache: yes
+
+    - name: Create SSL directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: "{{ '0700' if 'private' in item else '0755' }}"
+      loop:
+        - /etc/ssl/certs
+        - /etc/ssl/private
+
+    - name: Generate self-signed SSL certificate
+      shell: |
+        openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+        -keyout {{ ssl_key_path }} \
+        -out {{ ssl_cert_path }} \
+        -subj "/C=RU/ST=Moscow/L=Moscow/O=Test/CN={{ domain }}"
+      args:
+        creates: "{{ ssl_cert_path }}"
+      notify: Reload Nginx
+
+    - name: Configure Nginx
+      template:
+        src: files/reverse_proxy.j2
+        dest: /etc/nginx/sites-available/{{ domain }}
+      notify: Reload Nginx
+
+    - name: Enable site
+      file:
+        src: "/etc/nginx/sites-available/{{ domain }}"
+        dest: "/etc/nginx/sites-enabled/{{ domain }}"
+        state: link
+      notify: Reload Nginx
+
+    - name: Remove default site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: Reload Nginx
+
+  handlers:
+    - name: Reload Nginx
+      systemd:
+        name: nginx
+        state: reloaded

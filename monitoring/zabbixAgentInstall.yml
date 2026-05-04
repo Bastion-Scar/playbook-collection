@@ -1,0 +1,31 @@
+---
+- name: Install Zabbix Agent2
+  hosts: localhost
+  become: yes
+
+  vars_files:
+    - ../vars/variables.yml
+
+  tasks:
+
+    - name: Install Zabbix Agent2
+      apt:
+        name: zabbix-agent2
+        state: present
+        update_cache: yes
+
+    - name: Configure Zabbix Agent2
+      lineinfile:
+        path: /etc/zabbix/zabbix_agent2.conf
+        regexp: "^{{ item.key }}"
+        line: "{{ item.key }}={{ item.value }}"
+      loop:
+        - { key: "Server", value: "{{ zabbix_server }}" }
+        - { key: "ServerActive", value: "{{ zabbix_server }}" }
+        - { key: "Hostname", value: "debian" }
+
+    - name: Enable and restart Zabbix Agent2
+      systemd:
+        name: zabbix-agent2
+        enabled: yes
+        state: restarted

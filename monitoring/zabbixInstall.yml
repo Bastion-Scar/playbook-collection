@@ -1,0 +1,92 @@
+---
+- name: Zabbix with PostgreSQL 
+  hosts: monitoring
+  become: yes
+
+
+  vars_files:
+    - ../vars/variables.yml
+
+  tasks:
+
+    - name: Install base dependencies
+      apt:
+        name:
+          - ca-certificates
+          - curl
+          - python3
+          - python3-pip
+          - python3-docker
+        state: present
+        update_cache: yes
+
+    - name: Ensure Docker is installed
+      apt:
+        name:
+          - docker.io
+          - docker-compose-plugin
+        state: present
+        update_cache: yes
+
+    - name: Ensure Docker service is running
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Create Docker network if not exists
+      community.docker.docker_network:
+        name: zabbix-net
+        state: present
+
+    - name: Wait for PostgreSQL on remote host
+      wait_for:
+        host: "{{ zabbix_db_host }}"
+        port: 5432
+        timeout: 60
+
+
+    - name: Run Zabbix server
+      community.docker.docker_container:
+        name: zabbix-server
+        image: "zabbix/zabbix-server-pgsql:{{ zabbix_image_tag }}"
+        state: started
+        restart_policy: always
+        pull: true
+        networks:
+          - name: zabbix-net
+        env:
+          DB_SERVER_HOST: "{{ zabbix_db_host }}"
+          POSTGRES_DB: "{{ zabbix_db_name }}"
+          POSTGRES_USER: "{{ zabbix_db_user }}"
+          POSTGRES_PASSWORD: "{{ zabbix_db_password }}"
+        ports:
+          - "10051:10051"
+
+    - name: Run Zabbix web
+      community.docker.docker_container:
+        name: zabbix-web
+        image: "zabbix/zabbix-web-nginx-pgsql:{{ zabbix_image_tag }}"
+        state: started
+        restart_policy: always
+        pull: true
+        networks:
+          - name: zabbix-net
+        env:
+          DB_SERVER_HOST: "{{ zabbix_db_host }}"
+          POSTGRES_DB: "{{ zabbix_db_name }}"
+          POSTGRES_USER: "{{ zabbix_db_user }}"
+          POSTGRES_PASSWORD: "{{ zabbix_db_password }}"
+          ZBX_SERVER_HOST: "zabbix-server"
+          PHP_TZ: "Europe/Amsterdam"
+
+          # SMTP
+          ZBX_EMAIL: "{{ smtp_email }}"
+          ZBX_SMTP_SERVER: "{{ smtp_server }}"
+          ZBX_SMTP_PORT: "{{ smtp_port }}"
+          ZBX_SMTP_HELO: "zabbix.local"
+          ZBX_SMTP_EMAIL: "{{ smtp_email }}"
+          ZBX_SMTP_USER: "{{ smtp_user }}"
+          ZBX_SMTP_PASSWORD: "{{ smtp_password }}"
+        ports:
+          - "8080:8080"

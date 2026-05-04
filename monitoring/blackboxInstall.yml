@@ -1,0 +1,83 @@
+- name: Install Blackbox Exporter
+  hosts: monitoring
+  become: true
+
+  vars_files:
+    - ../vars/variables.yml
+    
+  tasks:
+
+    - name: Create user
+      user:
+        name: blackbox
+        system: yes
+        shell: /sbin/nologin
+
+    - name: Download blackbox exporter
+      get_url:
+        url: "https://github.com/prometheus/blackbox_exporter/releases/download/v0.25.0/blackbox_exporter-0.25.0.linux-amd64.tar.gz"
+        dest: /tmp/blackbox.tar.gz
+
+    - name: Extract archive
+      unarchive:
+        src: /tmp/blackbox.tar.gz
+        dest: /opt/
+        remote_src: yes
+
+    - name: Move binary
+      copy:
+        src: /opt/blackbox_exporter-0.25.0.linux-amd64/blackbox_exporter
+        dest: /usr/local/bin/blackbox_exporter
+        mode: '0755'
+        remote_src: yes
+
+    - name: Create config dir
+      file:
+        path: /etc/blackbox
+        state: directory
+
+    - name: Write config
+      copy:
+        dest: /etc/blackbox/blackbox.yml
+        content: |
+          modules:
+            http_2xx:
+              prober: http
+              timeout: 5s
+              http:
+                method: GET
+                follow_redirects: true
+                enable_http2: true
+                ip_protocol_fallback: true
+                tls_config:
+                  insecure_skip_verify: true
+
+    - name: Create systemd service
+      copy:
+        dest: /etc/systemd/system/blackbox.service
+        content: |
+          [Unit]
+          Description=Blackbox Exporter
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          User=blackbox
+          ExecStart=/usr/local/bin/blackbox_exporter \
+            --config.file=/etc/blackbox/blackbox.yml \
+            --web.listen-address=:9115
+          Restart=always
+          RestartSec=5
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: Enable and start blackbox
+      systemd:
+        name: blackbox
+        enabled: yes
+        state: started

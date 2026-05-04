@@ -1,0 +1,44 @@
+---
+- name: Install MariaDB
+  hosts: db_servers
+  become: true # рутка (не забыть)
+  
+  vars_files:
+    - vars/variables.yml
+
+  tasks:
+    - name: Remove cdrom from sources.list
+      lineinfile:
+        path: /etc/apt/sources.list
+        regexp: '^deb cdrom:'
+        state: absent
+
+    - name: Add proper repositories
+      copy:
+        content: |
+          deb http://deb.debian.org/debian trixie main contrib non-free non-free-firmware
+          deb http://deb.debian.org/debian-security trixie-security main contrib non-free non-free-firmware
+          deb http://deb.debian.org/debian trixie-updates main contrib non-free non-free-firmware
+        dest: /etc/apt/sources.list
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install MariaDB
+      apt:
+        name:
+          - mariadb-server
+          - python3-pymysql
+        state: present
+
+    - name: Start and enable MariaDB
+      systemd:
+        name: mariadb
+        state: started
+        enabled: yes
+
+
+
+
+   

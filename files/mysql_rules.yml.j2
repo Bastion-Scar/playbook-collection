@@ -1,0 +1,12 @@
+groups:
+  - name: mysql-replication
+    rules:
+      - record: mysql_seconds_behind_master
+        expr: |
+          (
+            mysql_slave_status_seconds_behind_master
+            or
+            mysql_slave_status_seconds_behind_source
+          )
+          or on(instance, job)
+          (mysql_slave_status_master_server_id * 0)
