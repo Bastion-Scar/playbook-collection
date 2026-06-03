@@ -29,7 +29,7 @@ loki_server: "10.202.49.56"
 
 node_exporter_version: "1.8.1"
 
-grafana_version: 12.4-ubuntu
+grafana_version: 13.0-ubuntu
 grafana_user: admin
 grafana_password: admin
 grafana_port: 3000
